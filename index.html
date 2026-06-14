@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sitges — The Living Guide</title>
+<meta name="description" content="An AI-powered, ever-evolving guide to Sitges: beaches, festivals, food, and a local AI guide that knows the town inside out.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================
+   Sitges — The Living Guide
+   Token system:
+   Day:      cream #FAF6EF, deep sea #0B4F6C, terracotta #E0673A, ink #1A2B33
+   Sunset:   warm coral wash, golden sun #F4B942
+   Festival: deep night blue, neon magenta accent
+   Type: Fraunces (display) + Inter (body) + JetBrains Mono (data/labels)
+   ============================================ */
+
+:root {
+  --cream: #FAF6EF;
+  --sea: #0B4F6C;
+  --sea-light: #2E7E9E;
+  --terracotta: #E0673A;
+  --gold: #F4B942;
+  --ink: #1A2B33;
+  --paper: #FFFFFF;
+
+  --bg: var(--cream);
+  --bg-alt: #F0E9DC;
+  --fg: var(--ink);
+  --fg-soft: #5C6B72;
+  --accent: var(--terracotta);
+  --accent-2: var(--sea);
+  --line: rgba(26,43,51,0.12);
+
+  --radius: 14px;
+  --transition: 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- Sunset mode ---- */
+body[data-mode="sunset"] {
+  --bg: #FCEFE3;
+  --bg-alt: #F8DCC8;
+  --fg: #3A2218;
+  --fg-soft: #8C5A3F;
+  --accent: #E0673A;
+  --accent-2: #F4B942;
+  --sea: #C9542E;
+  --line: rgba(58,34,24,0.14);
+}
+
+/* ---- Festival mode ---- */
+body[data-mode="festival"] {
+  --bg: #14132B;
+  --bg-alt: #1F1D40;
+  --fg: #F4EFE8;
+  --fg-soft: #B7AFD9;
+  --accent: #FF3D81;
+  --accent-2: #34E2C3;
+  --sea: #34E2C3;
+  --line: rgba(244,239,232,0.14);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  transition: background var(--transition), color var(--transition);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+a { color: inherit; }
+
+/* ============ MODE SWITCH ============ */
+.mode-switch {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+  background: var(--paper, var(--bg-alt));
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  transition: background var(--transition), border-color var(--transition);
+}
+body[data-mode="festival"] .mode-switch,
+body[data-mode="sunset"] .mode-switch {
+  background: var(--bg-alt);
+}
+.mode-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: none;
+  background: transparent;
+  color: var(--fg-soft);
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.mode-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ============ HERO ============ */
+.hero {
+  position: relative;
+  min-height: 92vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 24px;
+}
+
+.hero-bg { position: absolute; inset: 0; z-index: 0; }
+
+.hero-sun {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  height: 180px;
+  opacity: 0.9;
+  transition: all var(--transition);
+}
+.hero-sun circle { fill: var(--gold); }
+body[data-mode="sunset"] .hero-sun {
+  top: 22%;
+  width: 240px;
+  height: 240px;
+}
+body[data-mode="sunset"] .hero-sun circle { fill: var(--accent); }
+body[data-mode="festival"] .hero-sun {
+  width: 120px;
+  height: 120px;
+  top: 10%;
+  filter: blur(2px);
+}
+body[data-mode="festival"] .hero-sun circle { fill: var(--accent); opacity: 0.6; }
+
+.hero-waves {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 45%;
+}
+.wave { transition: fill var(--transition); }
+.wave1 { fill: var(--sea-light); opacity: 0.35; }
+.wave2 { fill: var(--sea); opacity: 0.5; }
+.wave3 { fill: var(--accent-2); opacity: 0.85; }
+
+body[data-mode="festival"] .wave1 { fill: var(--accent); opacity: 0.18; }
+body[data-mode="festival"] .wave2 { fill: var(--accent-2); opacity: 0.25; }
+body[data-mode="festival"] .wave3 { fill: var(--bg-alt); opacity: 0.9; }
+
+.wave1 { animation: drift 18s ease-in-out infinite; }
+.wave2 { animation: drift 14s ease-in-out infinite reverse; }
+.wave3 { animation: drift 22s ease-in-out infinite; }
+
+@keyframes drift {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(-3%) translateY(6px); }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  max-width: 760px;
+}
+
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-soft);
+  margin: 0 0 24px;
+}
+
+.hero-title {
+  font-size: clamp(3rem, 10vw, 6.5rem);
+  line-height: 0.95;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hero-title-sub {
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.32em;
+  color: var(--fg-soft);
+  letter-spacing: 0.02em;
+}
+
+.hero-tagline {
+  margin: 32px auto 40px;
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: var(--fg-soft);
+  max-width: 480px;
+}
+
+.hero-cta {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  padding: 14px 28px;
+  border-radius: 999px;
+  transition: all 0.3s ease;
+}
+.hero-cta:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+/* tide marker - signature element */
+.tide-marker {
+  position: absolute;
+  bottom: 28px;
+  left: 28px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tide-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-soft);
+}
+.tide-bar {
+  width: 100px;
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.tide-fill {
+  width: 60%;
+  height: 100%;
+  background: var(--accent);
+  transition: background var(--transition), width 1s ease;
+}
+body[data-mode="sunset"] .tide-fill { width: 85%; }
+body[data-mode="festival"] .tide-fill { width: 100%; }
+
+/* ============ STRIP ============ */
+.strip {
+  background: var(--accent);
+  color: var(--bg);
+  text-align: center;
+  padding: 18px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  transition: background var(--transition);
+}
+.strip-num {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* ============ GUIDE NAV ============ */
+.guide-nav {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.guide-card {
+  background: var(--bg);
+  text-decoration: none;
+  color: var(--fg);
+  padding: 36px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: background 0.3s ease, color var(--transition);
+}
+.guide-card:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+.guide-card-ai {
+  background: var(--accent-2);
+  color: var(--bg);
+}
+body[data-mode="day"] .guide-card-ai,
+body[data-mode="sunset"] .guide-card-ai { color: var(--paper); }
+.guide-card-ai:hover { background: var(--accent); }
+
+.guide-icon { font-size: 1.6rem; }
+.guide-label { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
+.guide-desc { font-size: 0.8rem; color: inherit; opacity: 0.7; }
+
+/* ============ SECTIONS ============ */
+.section {
+  padding: 100px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.section-dark {
+  max-width: none;
+  background: var(--bg-alt);
+  transition: background var(--transition);
+}
+.section-dark > * {
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.section-head {
+  max-width: 620px;
+  margin-bottom: 56px;
+}
+.section-head h2 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin-bottom: 16px;
+}
+.section-intro {
+  color: var(--fg-soft);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+/* ============ BEACHES ============ */
+.beach-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.beach-large { grid-column: span 2; }
+
+.beach-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: border-color 0.3s ease, transform 0.3s ease;
+}
+.beach-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+}
+.beach-card h3 {
+  font-size: 1.3rem;
+  margin-bottom: 8px;
+}
+.beach-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 14px;
+}
+.beach-card p:not(.beach-tag) {
+  color: var(--fg-soft);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ============ CULTURE ============ */
+.culture-list {
+  display: flex;
+  flex-direction: column;
+}
+.culture-item {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.culture-item:last-child { border-bottom: none; }
+.culture-mark {
+  font-family: 'Fraunces', serif;
+  font-size: 2.5rem;
+  font-style: italic;
+  color: var(--accent);
+  line-height: 1;
+}
+.culture-item h3 { font-size: 1.4rem; margin-bottom: 10px; }
+.culture-item p { color: var(--fg-soft); line-height: 1.7; margin: 0; }
+
+/* ============ FESTIVALS ============ */
+.festival-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.festival-card {
+  border-radius: var(--radius);
+  padding: 40px;
+  color: var(--bg);
+}
+.festival-carnival {
+  background: linear-gradient(135deg, var(--gold), var(--accent));
+}
+.festival-film {
+  background: var(--ink);
+}
+body[data-mode="festival"] .festival-film {
+  background: linear-gradient(135deg, #1F1D40, #14132B);
+  border: 1px solid var(--accent-2);
+}
+.festival-card h3 {
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+.festival-when {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin: 0 0 16px;
+}
+.festival-card p:not(.festival-when) {
+  line-height: 1.7;
+  opacity: 0.9;
+  margin: 0;
+}
+
+/* ============ FOOD ============ */
+.food-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+.food-card {
+  padding: 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.food-card h3 { font-size: 1.15rem; margin-bottom: 10px; }
+.food-card p { color: var(--fg-soft); line-height: 1.6; margin: 0; font-size: 0.92rem; }
+
+/* ============ ASSISTANT ============ */
+.assistant-section {
+  background: linear-gradient(180deg, var(--bg), var(--bg-alt));
+}
+.assistant-box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 640px;
+}
+.assistant-note {
+  color: var(--fg-soft);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+.assistant-input-row, .chat-input-row {
+  display: flex;
+  gap: 10px;
+}
+.assistant-input-row input, .chat-input-row input {
+  flex: 1;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+}
+.assistant-input-row input:focus, .chat-input-row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.btn-primary {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  border: none;
+  background: var(--accent);
+  color: var(--bg);
+  padding: 12px 24px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; cursor: wait; }
+
+.btn-link {
+  margin-top: 16px;
+  background: none;
+  border: none;
+  color: var(--fg-soft);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.chat-msg {
+  padding: 12px 16px;
+  border-radius: 14px;
+  line-height: 1.6;
+  font-size: 0.92rem;
+  max-width: 85%;
+}
+.chat-msg-ai {
+  background: var(--bg-alt);
+  align-self: flex-start;
+}
+.chat-msg-user {
+  background: var(--accent);
+  color: var(--bg);
+  align-self: flex-end;
+}
+
+/* ============ FOOTER ============ */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  font-size: 0.85rem;
+  color: var(--fg-soft);
+}
+.footer p { margin: 6px 0; }
+.footer a { text-decoration: underline; }
+.footer-small { font-size: 0.75rem; opacity: 0.7; }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 860px) {
+  .guide-nav { grid-template-columns: repeat(2, 1fr); }
+  .beach-grid { grid-template-columns: 1fr; }
+  .beach-large { grid-column: span 1; }
+  .festival-split { grid-template-columns: 1fr; }
+  .food-grid { grid-template-columns: repeat(2, 1fr); }
+  .culture-item { grid-template-columns: 50px 1fr; }
+  .section { padding: 64px 20px; }
+  .mode-switch { top: auto; bottom: 16px; right: 16px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition-duration: 0.01ms !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* Focus visibility */
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+</style>
+</head>
+<body data-mode="day">
+
+  <!-- Mode toggle: Day / Sunset / Festival -->
+  <div class="mode-switch" role="group" aria-label="Choose the mood of Sitges">
+    <button class="mode-btn active" data-mode="day" aria-pressed="true">Day</button>
+    <button class="mode-btn" data-mode="sunset" aria-pressed="false">Sunset</button>
+    <button class="mode-btn" data-mode="festival" aria-pressed="false">Festival</button>
+  </div>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <svg class="hero-sun" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40"/></svg>
+      <svg class="hero-waves" viewBox="0 0 1440 200" preserveAspectRatio="none" aria-hidden="true">
+        <path class="wave wave1" d="M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,200 L0,200 Z"/>
+        <path class="wave wave2" d="M0,110 C240,60 480,160 720,110 C960,60 1200,160 1440,110 L1440,200 L0,200 Z"/>
+        <path class="wave wave3" d="M0,140 C240,180 480,100 720,140 C960,180 1200,100 1440,140 L1440,200 L0,200 Z"/>
+      </svg>
+    </div>
+    <div class="hero-content">
+      <p class="eyebrow">41°14′ N · Garraf Coast · Catalonia</p>
+      <h1 class="hero-title">Sitges<span class="hero-title-sub">a town that turns with the light</span></h1>
+      <p class="hero-tagline">By noon: white facades, salt air, eleven beaches.<br>By night: neon, film reels, and the longest Carnival in Spain.<br>Switch the mode above — the whole town follows.</p>
+      <a href="#guide" class="hero-cta">Start exploring ↓</a>
+    </div>
+    <div class="tide-marker" aria-hidden="true">
+      <span class="tide-label">tide</span>
+      <div class="tide-bar"><div class="tide-fill"></div></div>
+    </div>
+  </header>
+
+  <!-- INTRO STRIP -->
+  <section class="strip">
+    <p><span class="strip-num">34 km</span> from Barcelona — <span class="strip-num">11</span> beaches — <span class="strip-num">300+</span> days of sun — <span class="strip-num">1</span> very famous Carnival</p>
+  </section>
+
+  <!-- GUIDE NAV -->
+  <nav id="guide" class="guide-nav">
+    <a href="#beaches" class="guide-card">
+      <span class="guide-icon">⛱</span>
+      <span class="guide-label">Beaches</span>
+      <span class="guide-desc">Eleven shores, eleven moods</span>
+    </a>
+    <a href="#culture" class="guide-card">
+      <span class="guide-icon">🏛</span>
+      <span class="guide-label">Culture &amp; Old Town</span>
+      <span class="guide-desc">Modernisme, museums, alleys</span>
+    </a>
+    <a href="#festivals" class="guide-card">
+      <span class="guide-icon">🎭</span>
+      <span class="guide-label">Festivals</span>
+      <span class="guide-desc">Carnival, Sitges Film Festival</span>
+    </a>
+    <a href="#food" class="guide-card">
+      <span class="guide-icon">🍤</span>
+      <span class="guide-label">Food &amp; Wine</span>
+      <span class="guide-desc">Arròs caldós, cava country</span>
+    </a>
+    <a href="#assistant" class="guide-card guide-card-ai">
+      <span class="guide-icon">✦</span>
+      <span class="guide-label">Ask the Local AI</span>
+      <span class="guide-desc">Plan your day, instantly</span>
+    </a>
+  </nav>
+
+  <!-- BEACHES -->
+  <section id="beaches" class="section">
+    <div class="section-head">
+      <h2>Eleven beaches, eleven moods</h2>
+      <p class="section-intro">The coastline runs for kilometers, but each stretch has its own character — find the one that matches yours.</p>
+    </div>
+    <div class="beach-grid">
+
+      <article class="beach-card beach-large">
+        <h3>Platja de Sant Sebastià</h3>
+        <p class="beach-tag">Family · Old Town</p>
+        <p>Tucked beside the historic centre, calm water and a lively promenade make this the classic first stop — close enough to walk to from anywhere downtown.</p>
+      </article>
+
+      <article class="beach-card">
+        <h3>Platja de la Bassa Rodona</h3>
+        <p class="beach-tag">LGBTQ+ · Lively</p>
+        <p>The main gay-friendly beach, busy and social through summer, right in the heart of the action.</p>
+      </article>
+
+      <article class="beach-card">
+        <h3>Platja del Balmins</h3>
+        <p class="beach-tag">Clothing-optional · Cove</p>
+        <p>Past the marina toward Port d'Aiguadolç, a small cove known for its relaxed, clothing-optional atmosphere.</p>
+      </article>
+
+      <article class="beach-card">
+        <h3>Platja de Terramar</h3>
+        <p class="beach-tag">Calm waters · West end</p>
+        <p>Rocky dykes create a sheltered lagoon — one of the safest spots for swimming, with a golf club just behind it.</p>
+      </article>
+
+      <article class="beach-card">
+        <h3>Platja de la Ribera</h3>
+        <p class="beach-tag">Family · East side</p>
+        <p>Near the Sant Bartomeu i Tecla church, a favourite for families staying on the eastern edge of town.</p>
+      </article>
+
+      <article class="beach-card beach-large">
+        <h3>Cala Morisca</h3>
+        <p class="beach-tag">Hidden · Quiet escape</p>
+        <p>Outside the main strip, a small wild cove surrounded by Garraf cliffs — bring water and shoes for the path, leave the crowds behind.</p>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- CULTURE -->
+  <section id="culture" class="section section-dark">
+    <div class="section-head">
+      <h2>The artists' town</h2>
+      <p class="section-intro">In the late 1800s, painters and architects fell for the light here — and never quite left. Their houses are now museums.</p>
+    </div>
+    <div class="culture-list">
+      <article class="culture-item">
+        <span class="culture-mark">I</span>
+        <div>
+          <h3>Cau Ferrat Museum</h3>
+          <p>The former home and studio of painter Santiago Rusiñol, packed with wrought iron, ceramics, and works by Rusiñol himself — plus a couple of pieces by a young friend named Picasso.</p>
+        </div>
+      </article>
+      <article class="culture-item">
+        <span class="culture-mark">II</span>
+        <div>
+          <h3>Palau de Maricel</h3>
+          <p>A early-20th-century palace mixing Gothic and Renaissance touches in a distinctly Catalan Noucentista style — courtyards, colour, and sea views. Guided visits run weekly, so book ahead.</p>
+        </div>
+      </article>
+      <article class="culture-item">
+        <span class="culture-mark">III</span>
+        <div>
+          <h3>Església de Sant Bartomeu i Santa Tecla</h3>
+          <p>The baroque church on the rocky point above the beach — Sitges' most photographed silhouette, especially at sunset.</p>
+        </div>
+      </article>
+      <article class="culture-item">
+        <span class="culture-mark">IV</span>
+        <div>
+          <h3>The Old Town</h3>
+          <p>White-washed houses, narrow lanes, and small squares built for getting pleasantly lost — every pass turns up something new.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- FESTIVALS -->
+  <section id="festivals" class="section">
+    <div class="section-head">
+      <h2>Two faces of one town</h2>
+      <p class="section-intro">Sitges hosts some of the liveliest festivals in Europe — and they couldn't be more different from each other.</p>
+    </div>
+    <div class="festival-split">
+      <article class="festival-card festival-carnival">
+        <h3>Carnival</h3>
+        <p class="festival-when">February · ~10 days before Lent</p>
+        <p>One of the longest, most flamboyant Carnivals in Spain — costume parades, all-night parties, and a town that fully commits to the bit.</p>
+      </article>
+      <article class="festival-card festival-film">
+        <h3>Sitges Film Festival</h3>
+        <p class="festival-when">October</p>
+        <p>The world's leading festival for fantasy and horror cinema — red carpets, late screenings, and a global cult following descending on a small beach town.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- FOOD -->
+  <section id="food" class="section section-dark">
+    <div class="section-head">
+      <h2>Eat like the coast</h2>
+      <p class="section-intro">Catalan seafood, rice dishes built for sharing, and some of the world's oldest cava cellars just inland.</p>
+    </div>
+    <div class="food-grid">
+      <article class="food-card">
+        <h3>Arròs caldós</h3>
+        <p>A brothy, almost-soupy rice dish loaded with seafood — the local answer to paella, eaten with a spoon.</p>
+      </article>
+      <article class="food-card">
+        <h3>Fresh-caught seafood</h3>
+        <p>Small streets near the seafront hide family-run spots specialising in the day's catch — simple grilling, big flavour.</p>
+      </article>
+      <article class="food-card">
+        <h3>Cava country</h3>
+        <p>The Penedès DO is minutes away — home to historic houses producing cava by traditional méthode, including some of the oldest family wineries in the world.</p>
+      </article>
+      <article class="food-card">
+        <h3>Rooftop &amp; sea views</h3>
+        <p>Lunch on a rooftop terrace overlooking the Mediterranean is practically a Sitges rite of passage.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- AI ASSISTANT -->
+  <section id="assistant" class="section assistant-section">
+    <div class="section-head">
+      <h2>Ask the Local AI</h2>
+      <p class="section-intro">Tell it what you're after — a quiet beach, a festival tip, a place to eat — and get a Sitges-shaped answer.</p>
+    </div>
+
+    <div class="assistant-box">
+      <div class="assistant-setup" id="setup-panel">
+        <p class="assistant-note">This feature calls the Claude API. Enter your Anthropic API key to enable it — it's stored only in your browser for this session and is never sent anywhere except directly to Anthropic.</p>
+        <div class="assistant-input-row">
+          <input type="password" id="api-key" placeholder="sk-ant-..." aria-label="Anthropic API key">
+          <button id="save-key" class="btn-primary">Connect</button>
+        </div>
+      </div>
+
+      <div class="assistant-chat" id="chat-panel" hidden>
+        <div class="chat-log" id="chat-log">
+          <div class="chat-msg chat-msg-ai">¡Hola! Ask me anything about Sitges — beaches for kids, where to watch the sunset, what to do during Carnival, anything.</div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="e.g. Best beach for a quiet morning?" aria-label="Your question">
+          <button id="chat-send" class="btn-primary">Ask</button>
+        </div>
+        <button id="change-key" class="btn-link">Change API key</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>Built with Mediterranean light and a bit of AI. Open source — <a href="https://github.com" target="_blank" rel="noopener">view on GitHub</a>.</p>
+    <p class="footer-small">Travel info is general guidance — verify opening hours and event dates locally before you go.</p>
+  </footer>
+
+  <script>
+// ============ MODE SWITCH ============
+const modeButtons = document.querySelectorAll('.mode-btn');
+modeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    document.body.dataset.mode = mode;
+    modeButtons.forEach(b => {
+      const active = b === btn;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', active);
+    });
+  });
+});
+
+// ============ AI ASSISTANT ============
+const SITGES_CONTEXT = `You are a friendly, knowledgeable local guide for Sitges, Spain (a coastal Catalan town near Barcelona).
+Key facts you know:
+- Beaches: Platja de Sant Sebastià (family, near old town, calm), Platja de la Bassa Rodona (LGBTQ+, lively),
+  Platja del Balmins (clothing-optional cove near the marina), Platja de Terramar (sheltered lagoon, calm, near golf club),
+  Platja de la Ribera (family, east side near Sant Bartomeu church), Cala Morisca (quiet hidden cove outside town, Garraf cliffs).
+- Culture: Cau Ferrat Museum (Santiago Rusiñol's home/studio), Palau de Maricel (Noucentista palace, weekly guided tours),
+  Església de Sant Bartomeu i Santa Tecla (iconic church on the point), the Old Town's white-washed lanes.
+- Festivals: Carnival (February, ~10 days, flamboyant parades and parties, one of Spain's longest), 
+  Sitges Film Festival (October, world-leading fantasy/horror film festival).
+- Food: arròs caldós (brothy seafood rice), fresh local seafood, rooftop restaurants with sea views, 
+  Penedès cava country (Codorniu, Freixenet, Gramona, Agustí Torelló Mata, Cava Llopart) a short drive inland.
+- Location: 34km southwest of Barcelona, in the Garraf natural park area.
+
+Answer concisely and warmly, like a local giving a friend a tip. Keep responses to 2-4 sentences unless asked for more detail.`;
+
+const setupPanel = document.getElementById('setup-panel');
+const chatPanel = document.getElementById('chat-panel');
+const apiKeyInput = document.getElementById('api-key');
+const saveKeyBtn = document.getElementById('save-key');
+const chatLog = document.getElementById('chat-log');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+const changeKeyBtn = document.getElementById('change-key');
+
+let apiKey = '';
+
+saveKeyBtn.addEventListener('click', () => {
+  const key = apiKeyInput.value.trim();
+  if (!key) return;
+  apiKey = key;
+  setupPanel.hidden = true;
+  chatPanel.hidden = false;
+  chatInput.focus();
+});
+
+changeKeyBtn.addEventListener('click', () => {
+  apiKey = '';
+  apiKeyInput.value = '';
+  chatPanel.hidden = true;
+  setupPanel.hidden = false;
+});
+
+function addMessage(text, sender) {
+  const div = document.createElement('div');
+  div.className = `chat-msg chat-msg-${sender}`;
+  div.textContent = text;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return div;
+}
+
+async function sendMessage() {
+  const question = chatInput.value.trim();
+  if (!question || !apiKey) return;
+
+  addMessage(question, 'user');
+  chatInput.value = '';
+  chatSend.disabled = true;
+  const loadingMsg = addMessage('Thinking…', 'ai');
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        system: SITGES_CONTEXT,
+        messages: [{ role: 'user', content: question }]
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      loadingMsg.textContent = `Error: ${data.error.message || 'something went wrong. Check your API key.'}`;
+    } else {
+      const text = data.content
+        .filter(block => block.type === 'text')
+        .map(block => block.text)
+        .join('\n');
+      loadingMsg.textContent = text || 'Sorry, I had trouble answering that — try again?';
+    }
+  } catch (err) {
+    loadingMsg.textContent = 'Connection error. Check your API key and try again.';
+  } finally {
+    chatSend.disabled = false;
+  }
+}
+
+chatSend.addEventListener('click', sendMessage);
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+</script>
+</body>
+</html>
